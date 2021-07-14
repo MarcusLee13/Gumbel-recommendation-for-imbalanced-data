@@ -19,16 +19,22 @@ def load_json(file_path):
     for line in lines:
         raw_data.append(json.loads(line))
 
+    # raw_data = collections.defaultdict(str)
     user_id = []
     item_id = []
+
     for d in raw_data:
-        data.append({'reviewerID': d['reviewerID'],
+        try:
+            print(d['reviewerID'])
+            data.append({'reviewerID': d['reviewerID'],
                      'asin': d['asin'],
                      'reviewText': d['reviewText'],
                      'overall': d['overall'],
                      "unixReviewTime": d["unixReviewTime"]})
-        user_id.append(d['reviewerID'])
-        item_id.append(d['asin'])
+            user_id.append(d['reviewerID'])
+            item_id.append(d['asin'])
+        except KeyError:
+            pass
 
     user_id = list(set(user_id))
     item_id = list(set(item_id))
@@ -123,35 +129,31 @@ def build_user_item_dict(data_list):
         user_dict[u][1].append(i)
         user_dict[u][2].append(s)
 
-
     umax_list = [len(user_dict[i][1]) for i in user_dict]
     umax_list = np.array(umax_list)
     u_max = np.percentile(umax_list, 80)
     u_max = int(u_max)
 
-
     for iss in range(len(dd)):
         d, i, u, s = dd[iss], ii[iss], uu[iss], ss[iss]
         if i not in item_dict:
             item_dict[i] = [d], [u], [s]
-            #i_max = max(i_max, 1)
+            # i_max = max(i_max, 1)
             continue
 
         item_dict[i][0].append(d)
         item_dict[i][1].append(u)
         item_dict[i][2].append(s)
 
-
     imax_list = [len(item_dict[i][1]) for i in item_dict]
     imax_list = np.array(imax_list)
-    i_max = np.percentile(imax_list,80)
+    i_max = np.percentile(imax_list, 80)
     i_max = int(i_max)
 
     return user_dict, item_dict, u_max, i_max
 
 
 def prepare_data(data, ):
-
     user_list = []
     item_list = []
     for d in data:
@@ -187,7 +189,6 @@ def prepare_data(data, ):
         else:
             test_data.append(i)
 
-
     data = train_data + test_data
     train_data = data[:splits]
     test_data = data[splits:]
@@ -201,7 +202,6 @@ def prepare_data(data, ):
 
 
 def get_x(user_dict, item_dict, user_id, item_id):
-
     user_review_list, item_list, result = user_dict[user_id]
 
     u_rating_percent = [10, 10, 10, 10, 10]
@@ -221,12 +221,11 @@ def get_x(user_dict, item_dict, user_id, item_id):
         a = int(i)
         i_rating_percent[a - 1] = (result1[i]) / len(result)
 
-
     item_review_list = torch.tensor(item_review_list)
     mask_item = [1 if i != user_id else 0 for i in user_list]
     item_review_list = item_review_list * (torch.tensor(mask_item)).unsqueeze(-1).long()
 
-    return user_review_list, item_list, item_review_list, user_list, user_id, item_id, u_rating_percent,i_rating_percent
+    return user_review_list, item_list, item_review_list, user_list, user_id, item_id, u_rating_percent, i_rating_percent
 
 
 class Batch:
@@ -277,7 +276,7 @@ class Batch:
             encode_vector = torch.tensor(encode_vector)
             encode_vector = encode_vector.unsqueeze(0)  # [1, 768]
 
-            user_review_list, mask_user, item_review_list, mask_item, u_id, i_id, u_rating_pecent,i_rating_pecent = get_x(
+            user_review_list, mask_user, item_review_list, mask_item, u_id, i_id, u_rating_pecent, i_rating_pecent = get_x(
                 self.user_dict, self.item_dict, user_id, item_id)
 
             user_review_list = user_review_list[:u_max]
@@ -326,12 +325,10 @@ class Batch:
         user_id_list = torch.tensor(user_id_list).unsqueeze(1)
         item_id_list = torch.tensor(item_id_list).unsqueeze(1)
 
-
         self.idx += batch_size
 
         user_review_lists = user_review_lists.long()
         item_review_lists = item_review_lists.long()
-
 
         return encode_vectors, user_review_lists, mask_users, item_review_lists, \
                mask_items, overalls, user_id_list, item_id_list, u_rating_ratio, i_rating_ratio
